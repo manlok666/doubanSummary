@@ -2,7 +2,10 @@
 import fs from 'fs/promises';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
-import {json} from "express";
+import dotenv from 'dotenv';
+
+//读取.env 中的配置
+dotenv.config();
 
 const COOKIE = process.env.DOUBAN_COOKIE || ''; // 请填入你的豆瓣 Cookie（仅用于个人备份）
 const USER_ID = process.env.DOUBAN_USER_ID || ''; // 默认示例，可覆盖
@@ -47,9 +50,8 @@ function parseItems(html, name) {
         const cover = $(el).find('img').attr('src') || '';
         const title =
             $(el).find('h2 a[title]').attr('title')?.trim() ||
-            $(el).find('h2 a').text().trim() ||
-            $(el).find('.title a').text().trim() ||
-            $(el).find('a').first().text().trim();
+            // $(el).find('h2 a').text().trim() ||
+            $(el).find('.title a').text().trim();
         // 书籍出版信息在 .pub；电影/其他在 .intro
         const info = $(el).find('.intro').text().trim() ||
             $(el).find('.pub').text().trim();
@@ -104,7 +106,7 @@ async function fetchWithPagination(name) {
 
     let start = 0;
     const pageSize = 15;
-    const maxLoops = 1000;
+    const maxLoops = 1;
     const fresh = [];
 
     for (let i = 0; i < maxLoops; i++, start += pageSize) {
