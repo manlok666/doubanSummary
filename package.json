@@ -1,0 +1,16 @@
+{
+  "name": "doubansummary",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "",
+  "main": "fetch_douban.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "private": true,
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2"
+  }
+}
