@@ -18,7 +18,14 @@
             target.innerHTML = `<li>${emptyLabel}</li>`;
             return;
         }
-        target.innerHTML = data.map(item => `<li>${formatter(item)}</li>`).join('');
+        target.innerHTML = data.map(item => {
+            const content = formatter(item);
+            if (content && typeof content === 'object') {
+                const { label = '', badge = '' } = content;
+                return `<li class="with-badge"><span class="badge-label">${label}</span>${badge ? `<span class="badge">${badge}</span>` : ''}</li>`;
+            }
+            return `<li>${content}</li>`;
+        }).join('');
     };
 
     const renderTopList = (targetId, list, emptyLabel = '暂无数据') => {
@@ -33,6 +40,9 @@
         const ratings = items.map(i => Number(i.rating)).filter(Number.isFinite);
         const durations = items.map(i => Number(i.duration_minutes)).filter(Number.isFinite);
         const totalMinutes = durations.reduce((sum, v) => sum + v, 0);
+        // 计算平均片长时排除掉小于 60 分钟的条目
+        const durationsForAvg = durations.filter(d => Number.isFinite(d) && d >= 60);
+
         const totalCommentChars = items.reduce((sum, item) => {
             const comments = Array.isArray(item.comments) ? item.comments : (item.comments ? [item.comments] : []);
             return sum + comments.reduce((cSum, comment) => cSum + (comment ? comment.length : 0), 0);
@@ -41,7 +51,7 @@
         const cards = [
             { label: '影片总数', value: items.length },
             { label: '平均评分', value: ratings.length ? average(ratings).toFixed(2) : '—' },
-            { label: '平均片长', value: durations.length ? `${Math.round(average(durations))} 分钟` : '—' },
+            { label: '平均片长', value: durationsForAvg.length ? `${Math.round(average(durationsForAvg))} 分钟` : '—' },
             { label: '累计观看时长', value: durations.length ? `${(totalMinutes / 60).toFixed(1)} 小时` : '—' },
             { label: '累计评论字数', value: totalCommentChars ? `${totalCommentChars.toLocaleString()} 字` : '—' }
         ];
@@ -64,26 +74,53 @@
         renderTopList('rating-list', ratingsCount);
     };
 
-    renderers.renderTimeAnalysis = (items, timeAgg) => {
+    renderers.renderTimeAnalysis = (items, timeAgg, options = {}) => {
+        const { hideYearly = false } = options;
+        const yearlyBlock = document.getElementById('yearly-compare-block');
+        if (yearlyBlock) yearlyBlock.style.display = hideYearly ? 'none' : '';
+
         const monthlyList = mapToDetailedList(timeAgg.monthly).sort((a, b) => a.key.localeCompare(b.key));
-        renderList('monthly-trend', monthlyList.slice(-12), item => `${item.key}：${item.count} 部 | 平均 ${formatNumber(item.avgRating)}`);
-        const yearlyList = mapToDetailedList(timeAgg.yearly).sort((a, b) => a.key.localeCompare(b.key));
-        renderList('yearly-compare', yearlyList, item => `${item.key}：${item.count} 部 | 平均 ${formatNumber(item.avgRating)}`);
+        const recentMonthly = monthlyList.slice(-12);
+
+        renderList('monthly-trend', recentMonthly, item => ({
+            label: `${item.key}｜平均 ${formatNumber(item.avgRating)} 分`,
+            badge: `${item.count} 部`
+        }));
+
+        if (!hideYearly) {
+            const yearlyList = mapToDetailedList(timeAgg.yearly).sort((a, b) => a.key.localeCompare(b.key)).slice(-6);
+            renderList('yearly-compare', yearlyList, item => ({
+                label: `${item.key}｜平均 ${formatNumber(item.avgRating)} 分`,
+                badge: `${item.count} 部`
+            }));
+        } else {
+            const yearly = document.getElementById('yearly-compare');
+            if (yearly) yearly.innerHTML = '<li>时间跨度不足以展示年度趋势</li>';
+        }
+
+        renderList('rating-timeline', recentMonthly, item => ({
+            label: `${item.key}｜${item.count} 部`,
+            badge: `${formatNumber(item.avgRating)} 分`
+        }));
 
         const summary = [];
         if (monthlyList.length) {
             const peak = monthlyList.reduce((max, cur) => cur.count > max.count ? cur : max, monthlyList[0]);
             const low = monthlyList.reduce((min, cur) => cur.count < min.count ? cur : min, monthlyList[0]);
-            summary.push(`高峰期：${peak.key}，${peak.count} 部`);
-            summary.push(`淡季：${low.key}，${low.count} 部`);
+            summary.push({ label: `高峰期：${peak.key}`, badge: `${peak.count} 部` });
+            summary.push({ label: `淡季：${low.key}`, badge: `${low.count} 部` });
             if (monthlyList.length > 1) {
                 const trendDelta = monthlyList[monthlyList.length - 1].count - monthlyList[0].count;
                 const trend = trendDelta > 0 ? '逐步升温' : (trendDelta < 0 ? '渐趋平缓' : '总体稳定');
                 summary.push(`长期趋势：${trend}`);
             }
         }
-        if (timeAgg.datedCount && timeAgg.monthly.size) summary.push(`平均每月 ${(timeAgg.datedCount / timeAgg.monthly.size).toFixed(1)} 部`);
-        if (timeAgg.earliest && timeAgg.latest) summary.push(`观影跨度：${utils.formatDateDisplay(timeAgg.earliest)} - ${utils.formatDateDisplay(timeAgg.latest)}`);
+        if (timeAgg.datedCount && timeAgg.monthly.size) {
+            summary.push({ label: '平均每月', badge: `${(timeAgg.datedCount / timeAgg.monthly.size).toFixed(1)} 部` });
+        }
+        if (timeAgg.earliest && timeAgg.latest) {
+            summary.push({ label: '观影跨度', badge: `${utils.formatDateDisplay(timeAgg.earliest)} - ${utils.formatDateDisplay(timeAgg.latest)}` });
+        }
         renderList('time-summary', summary, item => item);
     };
 
@@ -113,14 +150,12 @@
     renderers.renderRatingAnalysis = (items, timeAgg) => {
         const ratings = items.map(x => Number(x.rating)).filter(Number.isFinite);
         renderRatingHistogramChart(buildRatingHistogram(ratings));
-        const monthlyList = mapToDetailedList(timeAgg.monthly).sort((a, b) => a.key.localeCompare(b.key));
-        renderList('rating-timeline', monthlyList.slice(-12), item => `${item.key}：平均 ${formatNumber(item.avgRating)} 分（${item.count} 部）`);
+        // 移除按月评分序列的重复渲染，现由 renderTimeAnalysis 负责
         const quantiles = computeQuantiles(ratings);
         const highShare = ratings.length ? ((ratings.filter(r => r >= 8).length / ratings.length) * 100).toFixed(1) : '0.0';
         const lowShare = ratings.length ? ((ratings.filter(r => r <= 6).length / ratings.length) * 100).toFixed(1) : '0.0';
         const summary = ratings.length ? [
             `评分范围：${formatNumber(quantiles.min)} - ${formatNumber(quantiles.max)}`,
-            `箱线：Q1 ${formatNumber(quantiles.q1)}, 中位 ${formatNumber(quantiles.median)}, Q3 ${formatNumber(quantiles.q3)}`,
             `高分占比（≥8）：${highShare}%`,
             `低分占比（≤6）：${lowShare}%`
         ] : ['暂无评分数据'];
@@ -150,12 +185,16 @@
     renderers.renderGenrePreference = items => {
         try {
             const genreStats = aggregateFieldStats(items, item => normalizeGenres(item.genres));
-            const prefList = genreStats.slice(0, 8).map(g => ({
-                label: g.label, count: g.count, avgRating: g.avgRating
+            const prefList = genreStats.slice(0, 8);
+            renderList('genre-pref', prefList, item => ({
+                label: `${item.label}｜平均 ${formatNumber(item.avgRating)} 分`,
+                badge: `${item.count} 部`
             }));
-            renderList('genre-pref', prefList, item => `${item.label}：${item.count} 部 | 平均 ${formatNumber(item.avgRating)}`);
             const combo = getGenreComboStats(items).slice(0, 10);
-            renderList('genre-combo', combo, item => `${item.label}：${item.count} 次 | 平均 ${formatNumber(item.avgRating)}`, '暂无类型组合数据');
+            renderList('genre-combo', combo, item => ({
+                label: `${item.label}｜平均 ${formatNumber(item.avgRating)} 分`,
+                badge: `${item.count} 次`
+            }), '暂无类型组合数据');
         } catch (err) {
             console.warn('renderGenrePreference error:', err);
             renderList('genre-pref', [], () => '暂无数据');
@@ -211,9 +250,9 @@
     const renderCreatorTableFor = role => {
         const tbody = document.getElementById('creator-table-body');
         if (!tbody) return;
-        const list = (creatorStatsCache[role] || []).filter(row => Number(row.count) >= 5);
+        const list = (creatorStatsCache[role] || []).filter(row => Number(row.count) >= 4);
         if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="4">暂无符合（观影次数 ≥ 5）创作者数据</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4">暂无符合（观影次数 ≥ 4）创作者数据</td></tr>';
             return;
         }
         tbody.innerHTML = list.slice(0, 50).map(row => `
@@ -244,6 +283,10 @@
         const languageStats = aggregateFieldStats(items, item => normalizeField(item.languages));
         const regionTotal = regionStats.reduce((sum, item) => sum + item.count, 0);
         const languageTotal = languageStats.reduce((sum, item) => sum + item.count, 0);
+
+        renderRegionBarChart(regionStats.slice(0, 6), regionTotal);
+        renderLanguageDonutChart(languageStats.slice(0, 6), languageTotal);
+
         renderList('region-list-extended', regionStats.slice(0, 10),
             item => `${item.label}：${item.count} 部（${formatShare(item.count, regionTotal)}%）| 平均 ${formatNumber(item.avgRating)}`);
         renderList('language-list-extended', languageStats.slice(0, 10),
@@ -305,62 +348,10 @@
             count: stats.count,
             avgRating: stats.ratingCount ? stats.ratingSum / stats.ratingCount : null
         }));
-        renderList('decade-summary', list, item => `${item.label}：${item.count} 部 | 平均 ${formatNumber(item.avgRating)}`);
-    };
-
-    const buildKeywords = (text, topN = 10) => {
-        if (!text) return [];
-        const cleaned = text.replace(/[^\u4e00-\u9fffA-Za-z0-9]+/g, ' ');
-        const parts = cleaned.split(/\s+/).map(s => s.trim()).filter(Boolean);
-        const tokens = [];
-        parts.forEach(part => {
-            if (/^[A-Za-z0-9]+$/.test(part)) {
-                part.split(/[^A-Za-z0-9]+/).forEach(w => {
-                    const word = w.toLowerCase();
-                    if (word.length < 3 || stopWords.has(word)) return;
-                    if (/(ing|ed|s)$/.test(word) && word.length <= 5) return;
-                    const hasAdjSuffix = adjSuffixes.some(suf => word.endsWith(suf));
-                    const hasNounSuffix = nounSuffixes.some(suf => word.endsWith(suf));
-                    if (hasAdjSuffix || hasNounSuffix || word.length >= 4) tokens.push(word);
-                });
-                return;
-            }
-            const zhSeqs = part.match(/[\u4e00-\u9fff]+/g) || [];
-            zhSeqs.forEach(seq => {
-                const maxN = Math.min(4, seq.length);
-                for (let n = 2; n <= maxN; n++) {
-                    for (let i = 0; i <= seq.length - n; i++) {
-                        const gram = seq.slice(i, i + n);
-                        if (!gram || stopWords.has(gram)) continue;
-                        tokens.push(gram);
-                    }
-                }
-            });
-            if (!zhSeqs.length) {
-                const seq = part.replace(/[^A-Za-z0-9\u4e00-\u9fff]/g, '');
-                if (seq.length >= 3 && seq.length <= 30) {
-                    const candidate = seq.length > 8 ? seq.slice(0, 8) : seq.toLowerCase();
-                    if (!stopWords.has(candidate)) tokens.push(candidate);
-                }
-            }
-        });
-        const freq = new Map();
-        tokens.forEach(token => {
-            if (!token || token.length > 30) return;
-            freq.set(token, (freq.get(token) || 0) + 1);
-        });
-        const entries = [...freq.entries()];
-        entries.sort((a, b) => {
-            if (b[1] !== a[1]) return b[1] - a[1];
-            const aIsZh = /[\u4e00-\u9fff]/.test(a[0]);
-            const bIsZh = /[\u4e00-\u9fff]/.test(b[0]);
-            if (aIsZh !== bIsZh) return aIsZh ? -1 : 1;
-            const aHasAffix = [...nounSuffixes, ...adjSuffixes].some(suf => a[0].endsWith(suf));
-            const bHasAffix = [...nounSuffixes, ...adjSuffixes].some(suf => b[0].endsWith(suf));
-            if (aHasAffix !== bHasAffix) return aHasAffix ? -1 : 1;
-            return a[0].length - b[0].length;
-        });
-        return entries.slice(0, topN);
+        renderList('decade-summary', list, item => ({
+            label: `${item.label}｜平均 ${formatNumber(item.avgRating)} 分`,
+            badge: `${item.count} 部`
+        }));
     };
 
     const getSentimentBreakdown = comments => {
@@ -396,24 +387,22 @@
         const sentiment = getSentimentBreakdown(comments);
         return {
             statsList: comments.length ? [
-                `评论条数：${comments.length}`,
-                `总字数：${totalChars.toLocaleString()} 字`,
-                `平均每条 ${avg} 字`,
-                longest.length ? `最长评论来自《${longest.title}》，${longest.length} 字` : '暂无显著长评'
+                { label: '评论条数', badge: `${comments.length} 条` },
+                { label: '总字数', badge: `${totalChars.toLocaleString()} 字` },
+                { label: '平均每条', badge: `${avg} 字` },
+                longest.length ? { label: '最长评论', badge: `《${longest.title}》${longest.length} 字` } : '暂无显著长评'
             ] : ['尚无评论记录'],
-            keywordsList: comments.length ? buildKeywords(comments.map(c => c.text).join(' ')).map(([word, count]) => `${word}（${count}）`) : ['暂无关键词'],
             sentimentList: comments.length ? [
-                `正向：${sentiment.positive} 条`,
-                `中性：${sentiment.neutral} 条`,
-                `负向：${sentiment.negative} 条`
+                { label: '正向', badge: `${sentiment.positive} 条` },
+                { label: '中性', badge: `${sentiment.neutral} 条` },
+                { label: '负向', badge: `${sentiment.negative} 条` }
             ] : ['暂无情感数据']
         };
     };
 
     renderers.renderCommentsAnalysis = items => {
-        const { statsList, keywordsList, sentimentList } = analyzeComments(items);
+        const { statsList, sentimentList } = analyzeComments(items);
         renderList('comments-stats', statsList, item => item);
-        renderList('comments-keywords', keywordsList, item => item);
         renderList('comments-sentiment', sentimentList, item => item);
     };
 
@@ -445,14 +434,19 @@
         const genreStats = aggregateFieldStats(items, item => normalizeGenres(item.genres));
         const regionStats = aggregateFieldStats(items, item => normalizeField(item.regions));
         const languageStats = aggregateFieldStats(items, item => normalizeField(item.languages));
-        const directorStats = aggregateFieldStats(items, item => normalizeField(item.directors));
         const pace = (timeAgg.datedCount && timeAgg.monthly.size) ? (timeAgg.datedCount / timeAgg.monthly.size).toFixed(1) : '—';
+        const highestRatedGenre = genreStats.reduce((best, current) => {
+            if (!Number.isFinite(current.avgRating)) return best;
+            if (!best || (current.avgRating > best.avgRating)) return current;
+            return best;
+        }, null);
+
         const cards = [
             { label: '月均观影', value: pace !== '—' ? `${pace} 部/月` : '—' },
-            { label: '偏好类型', value: genreStats.length ? `${genreStats[0].label}（${genreStats[0].count} 部）` : '—' },
+            { label: '常看类型', value: genreStats.length ? `${genreStats[0].label}（${genreStats[0].count} 部）` : '—' },
             { label: '偏好地区', value: regionStats.length ? `${regionStats[0].label}` : '—' },
             { label: '偏好语言', value: languageStats.length ? `${languageStats[0].label}` : '—' },
-            { label: '常看导演', value: directorStats.length ? `${directorStats[0].label}（${directorStats[0].count} 部）` : '—' }
+            { label: '均分最高类型', value: highestRatedGenre ? `${highestRatedGenre.label}（${formatNumber(highestRatedGenre.avgRating)} 分）` : '—' }
         ];
         const container = document.getElementById('summary-cards');
         if (!container) return;
@@ -462,5 +456,150 @@
                 <p class="data-value">${card.value}</p>
             </div>
         `).join('');
+    };
+
+    const renderRegionBarChart = (data, total) => {
+        const container = document.getElementById('region-bar-chart');
+        if (!container) return;
+        if (!data || !data.length) {
+            container.innerHTML = '<div class="empty">暂无地区数据</div>';
+            return;
+        }
+        const max = Math.max(...data.map(item => item.count), 1);
+        container.innerHTML = data.map(item => {
+            const width = ((item.count / max) * 100).toFixed(1);
+            const share = formatShare(item.count, total);
+            return `
+                <div class="col-row">
+                    <span class="col-label">${item.label}</span>
+                    <div class="col-bar-wrap">
+                        <div class="col-bar" style="width:${width}%"></div>
+                    </div>
+                    <span class="col-count">${share}%</span>
+                </div>`;
+        }).join('');
+    };
+
+    const renderLanguageDonutChart = (data, total) => {
+        const container = document.getElementById('language-donut-chart');
+        if (!container) return;
+        if (!data || !data.length || !total) {
+            container.innerHTML = '<div class="empty">暂无语言数据</div>';
+            return;
+        }
+        const palette = ['#7dd3fc','#a5b4fc','#f472b6','#facc15','#34d399','#fb7185'];
+        let acc = 0;
+        const segments = data.map((item, idx) => {
+            const pct = (item.count / total) * 100;
+            const start = acc;
+            acc += pct;
+            return `${palette[idx % palette.length]} ${start}% ${Math.min(acc, 100)}%`;
+        }).join(', ');
+        const legends = data.map((item, idx) => {
+            const share = formatShare(item.count, total);
+            return `
+                <div class="legend-item">
+                    <span class="legend-dot" style="background:${palette[idx % palette.length]}"></span>
+                    <span>${item.label}</span>
+                    <span class="legend-share">${share}%</span>
+                </div>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="donut" style="background: conic-gradient(${segments});"></div>
+            <div class="legend">
+                ${legends}
+            </div>`;
+    };
+
+    const renderMonthlyTrendChart = data => {
+        const container = document.getElementById('monthly-trend-chart');
+        if (!container) return;
+        if (!data || !data.length) {
+            container.innerHTML = '<div class="empty">暂无月度数据</div>';
+            return;
+        }
+        const counts = data.map(d => d.count || 0);
+        const max = Math.max(...counts, 1);
+        const labels = data.map(d => d.key);
+        const viewW = 800, viewH = 220;
+        const pad = { l: 50, r: 20, t: 20, b: 40 };
+        const plotW = viewW - pad.l - pad.r;
+        const plotH = viewH - pad.t - pad.b;
+        const step = data.length > 1 ? plotW / (data.length - 1) : plotW;
+        const points = counts.map((c, i) => ({
+            x: pad.l + i * step,
+            y: pad.t + (1 - c / max) * plotH,
+            label: labels[i],
+            count: c
+        }));
+        const areaPath = `M ${pad.l},${viewH - pad.b} ` + points.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${pad.l + plotW},${viewH - pad.b} Z`;
+        const polyPoints = points.map(p => `${p.x},${p.y}`).join(' ');
+        const primary = getComputedStyle(document.documentElement).getPropertyValue('--data-primary') || '#4338ca';
+        const secondary = getComputedStyle(document.documentElement).getPropertyValue('--data-secondary') || '#0ea5e9';
+        container.innerHTML = `
+            <svg viewBox="0 0 ${viewW} ${viewH}" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="monthlyArea" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="${primary.trim()}" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="${secondary.trim()}" stop-opacity="0.05"/>
+                    </linearGradient>
+                </defs>
+                <path d="${areaPath}" fill="url(#monthlyArea)" stroke="none"></path>
+                <polyline points="${polyPoints}" stroke="${primary.trim()}" fill="none" stroke-width="3"/>
+                ${points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#fff" stroke="${primary.trim()}"><title>${p.label}：${p.count} 部</title></circle>`).join('')}
+                ${points.map((p,i) => (i % Math.ceil(points.length / 6) === 0 || i === points.length - 1)
+                    ? `<text x="${p.x}" y="${viewH - 10}" class="x-label" text-anchor="middle">${p.label}</text>` : '').join('')}
+            </svg>`;
+    };
+
+    const renderYearlyCompareChart = data => {
+        const container = document.getElementById('yearly-compare-chart');
+        if (!container) return;
+        if (!data || !data.length) {
+            container.innerHTML = '<div class="empty">暂无年度数据</div>';
+            return;
+        }
+        const max = Math.max(...data.map(d => d.count || 0), 1);
+        container.innerHTML = `
+            <div class="bars">
+                ${data.map(d => {
+                    const h = ((d.count || 0) / max) * 100;
+                    return `<div class="bar" style="height:${h}%"><span>${d.count}</span></div>`;
+                }).join('')}
+            </div>
+            <div class="labels">
+                ${data.map(d => `<span>${d.key}</span>`).join('')}
+            </div>`;
+    };
+
+    const renderRatingTimelineChart = data => {
+        const container = document.getElementById('rating-timeline-chart');
+        if (!container) return;
+        if (!data || !data.length) {
+            container.innerHTML = '<div class="empty">暂无评分数据</div>';
+            return;
+        }
+        const values = data.map(d => Number(d.avgRating) || 0);
+        const max = Math.max(...values, 1);
+        const min = Math.min(...values, 0);
+        const viewW = 800, viewH = 180;
+        const pad = { l: 40, r: 20, t: 20, b: 30 };
+        const plotW = viewW - pad.l - pad.r;
+        const plotH = viewH - pad.t - pad.b;
+        const step = data.length > 1 ? plotW / (data.length - 1) : plotW;
+        const primary = getComputedStyle(document.documentElement).getPropertyValue('--data-accent') || '#14b8a6';
+        const points = values.map((val, i) => {
+            const ratio = max === min ? 0.5 : (val - min) / (max - min);
+            return { x: pad.l + i * step, y: pad.t + (1 - ratio) * plotH, label: data[i].key, val };
+        });
+        const polyPoints = points.map(p => `${p.x},${p.y}`).join(' ');
+        container.innerHTML = `
+            <svg viewBox="0 0 ${viewW} ${viewH}" preserveAspectRatio="none">
+                <polyline points="${polyPoints}" stroke="${primary.trim()}" fill="none" stroke-width="2.5"/>
+                ${points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#fff" stroke="${primary.trim()}"><title>${p.label}：${formatNumber(p.val)}</title></circle>`).join('')}
+                ${points.map((p,i) => (i % Math.ceil(points.length / 6) === 0 || i === points.length - 1)
+                    ? `<text x="${p.x}" y="${viewH - 6}" class="x-label" text-anchor="middle">${p.label}</text>` : '').join('')}
+            </svg>`;
     };
 })();

@@ -309,7 +309,9 @@
         const time = item.updated_at || item.date || '';
         const commentBrief = (item.comments && item.comments.length) ? item.comments[0] : '';
         const id = `${cat}-${idx}`;
-        const slug = slugify(title || `pic-${id}`);
+
+        const linkId = extractIdFromLink(item.link);
+        const imageKey = linkId || slugify(title || `pic-${id}`);
         const cover = item.cover || item.image || '';
 
         const card = document.createElement('div');
@@ -321,7 +323,7 @@
         const img = document.createElement('img');
         img.setAttribute('loading', 'lazy');
         img.dataset.cover = cover;
-        img.dataset.slug = slug;
+        img.dataset.key = imageKey;
         img.alt = title;
         img.src = `data:image/svg+xml,${encodeURIComponent(placeholderSvg(title))}`;
 
@@ -365,7 +367,7 @@
             });
         }, { rootMargin: '200px 0px', threshold: 0.1 });
 
-        contentEl.querySelectorAll('img[data-cover][data-slug]').forEach(img => {
+        contentEl.querySelectorAll('img[data-cover][data-key]').forEach(img => {
             imgObserver.observe(img);
         });
     }
@@ -373,8 +375,8 @@
     async function hydrateOneImage(img) {
         if (img.dataset.hydrated) return;
         const cover = img.dataset.cover;
-        const slug = img.dataset.slug || 'pic';
-        const localPath = `${PIC_ROOT}/${slug}.jpg`;
+        const key = img.dataset.key || 'pic';
+        const localPath = `${PIC_ROOT}/${key}.jpg`;
 
         if (slugHeadCache.has(localPath) || await headLocal(localPath)) {
             slugHeadCache.add(localPath);
@@ -383,7 +385,7 @@
             return;
         }
         if (!cover) return;
-        const ok = await cacheRemote(slug, cover);
+        const ok = await cacheRemote(key, cover);
         if (ok) {
             slugHeadCache.add(localPath);
             img.src = localPath;
@@ -395,13 +397,20 @@
     }
 
     async function headLocal(path) { try { const res = await fetch(path, { method:'HEAD', cache:'no-cache' }); return res.ok; } catch { return false; } }
-    async function cacheRemote(slug, coverUrl) {
+    async function cacheRemote(picId, coverUrl) {
         try {
-            const res = await fetch('/api/cache-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, url: coverUrl }) });
+            const res = await fetch('/api/cache-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pic_id: picId, url: coverUrl }) });
             return res.ok;
         } catch { return false; }
     }
     function slugify(str) { return (str || 'pic').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,60) || 'pic'; }
+
+    function extractIdFromLink(link) {
+        if (!link) return null;
+        const m = link.match(/\d+/);
+        return m ? m[0] : null;
+    }
+
     function placeholderSvg(text) {
         const safe = (text || '?').slice(0, 6);
         return `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='220'>

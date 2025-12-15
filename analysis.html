@@ -56,25 +56,50 @@
 </section>
 
 <section>
-    <h2>观影时间与频率分析</h2>
     <div class="flex">
         <div class="list">
             <h3>月度趋势</h3>
             <ul id="monthly-trend"></ul>
         </div>
-        <div class="list">
+        <div class="list" id="yearly-compare-block">
             <h3>年度对比</h3>
             <ul id="yearly-compare"></ul>
         </div>
         <div class="list">
-            <h3>观影节奏摘要</h3>
-            <ul id="time-summary"></ul>
+            <h3>年代偏好</h3>
+            <ul id="decade-summary"></ul>
         </div>
     </div>
 </section>
 
 <section>
-    <h2>评分分布与偏好</h2>
+    <div class="flex">
+        <div class="list">
+            <div class="creator-tabs" role="tablist" aria-label="创作者角色切换">
+                <button data-role="directors" class="active" role="tab" aria-selected="true">导演</button>
+                <button data-role="writers" role="tab" aria-selected="false">编剧</button>
+                <button data-role="actors" role="tab" aria-selected="false">演员</button>
+            </div>
+            <!-- 改为：页签 + 表格 -->
+            <div class="creator-panel">
+
+                <table id="creator-table" class="creator-table">
+                    <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>角色</th>
+                        <th>观影次数</th>
+                        <th>平均评分</th>
+                    </tr>
+                    </thead>
+                    <tbody id="creator-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
     <div class="flex">
         <div class="list">
             <h3>评分直方图</h3>
@@ -82,18 +107,33 @@
             <div id="rating-histogram-chart" class="chart-histogram" aria-hidden="false"></div>
         </div>
         <div class="list">
-            <h3>评分时间序列（按月）</h3>
-            <ul id="rating-timeline"></ul>
+            <h3>地区偏好</h3>
+            <div id="region-bar-chart" class="chart-column"></div>
+            <!--            <ul id="region-list-extended"></ul>-->
         </div>
         <div class="list">
-            <h3>评分摘要</h3>
-            <ul id="rating-summary"></ul>
+            <h3>语言偏好</h3>
+            <div id="language-donut-chart" class="chart-donut"></div>
+            <!--            <ul id="language-list-extended"></ul>-->
         </div>
     </div>
 </section>
 
 <section>
-    <h2>类型偏好</h2>
+    <h3>综合关联分析</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>特征组合（类型 × 地区 × 年代）</th>
+            <th>部数</th>
+            <th>平均评分</th>
+        </tr>
+        </thead>
+        <tbody id="correlation-table-body"></tbody>
+    </table>
+</section>
+
+<section>
     <div class="flex">
         <div class="list">
             <h3>单类型观察</h3>
@@ -107,80 +147,20 @@
 </section>
 
 <section>
-    <div class="creator-tabs" role="tablist" aria-label="创作者角色切换">
-        <button data-role="directors" class="active" role="tab" aria-selected="true">导演</button>
-        <button data-role="writers" role="tab" aria-selected="false">编剧</button>
-        <button data-role="actors" role="tab" aria-selected="false">演员</button>
-    </div>
-
-    <!-- 改为：页签 + 表格 -->
-    <div class="creator-panel">
-
-        <table id="creator-table" class="creator-table">
-            <thead>
-            <tr>
-                <th>名称</th>
-                <th>角色</th>
-                <th>观影次数</th>
-                <th>平均评分</th>
-            </tr>
-            </thead>
-            <tbody id="creator-table-body"></tbody>
-        </table>
-    </div>
-</section>
-
-<section>
-    <h2>地区与语言偏好</h2>
     <div class="flex">
         <div class="list">
-            <h3>地区偏好</h3>
-            <ul id="region-list-extended"></ul>
+            <h3>观影节奏摘要</h3>
+            <ul id="time-summary"></ul>
         </div>
-        <div class="list">
-            <h3>语言偏好</h3>
-            <ul id="language-list-extended"></ul>
-        </div>
-    </div>
-</section>
-
-<section>
-    <div class="list">
-        <h3>年代偏好</h3>
-        <ul id="decade-summary"></ul>
-    </div>
-</section>
-
-<section>
-    <h2>评论热度与情感</h2>
-    <div class="flex">
         <div class="list">
             <h3>评论热度</h3>
             <ul id="comments-stats"></ul>
-        </div>
-        <div class="list">
-            <h3>关键词</h3>
-            <ul id="comments-keywords"></ul>
         </div>
         <div class="list">
             <h3>情感倾向</h3>
             <ul id="comments-sentiment"></ul>
         </div>
     </div>
-</section>
-
-<section>
-    <h2>综合关联分析</h2>
-    <table>
-        <thead>
-        <tr>
-            <th>特征组合（类型 × 地区 × 年代）</th>
-            <th>部数</th>
-            <th>平均评分</th>
-        </tr>
-        </thead>
-        <tbody id="correlation-table-body"></tbody>
-    </table>
 </section>
 
 <!-- 引入按功能拆分的脚本 -->

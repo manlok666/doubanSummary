@@ -22,14 +22,14 @@ app.get('/analysis', (req, res) => {
 
 // 缓存图片接口
 app.post('/api/cache-image', async (req, res) => {
-    const { slug, url } = req.body || {};
-    if (!slug || !url) return res.status(400).send('missing slug or url');
+    const { pic_id, url } = req.body || {};
+    if (!pic_id || !url) return res.status(400).send(`missing id or url${JSON.parse(req.body)}`);
 
     try {
         const r = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
         if (!r.ok) return res.status(502).send('fetch remote failed');
         const buf = await r.buffer();
-        const filePath = path.join(PIC_DIR, `${slug}.jpg`);
+        const filePath = path.join(PIC_DIR, `${pic_id}.jpg`);
         await fs.writeFile(filePath, buf);
         res.status(200).send('ok');
     } catch (e) {

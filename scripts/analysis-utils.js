@@ -8,8 +8,8 @@
         'movie','film','watch','watched','seen','like','just','very','also','one','two','get','got','see','seen',
         '的','了','在','和','是','也','就','都','而','与','或','及','被','于','对','从','到','但','而且','所以','如果','因为','还有','我们','你们','他们','她们','它们','这','那','一个','没有','还是','已经','就是','对于','以及','其中','其中的'
     ]);
-    utils.positiveWords = ['good','great','love','excellent','amazing','favorite','喜欢','好看','精彩','推荐'];
-    utils.negativeWords = ['bad','terrible','boring','worst','disappoint','hate','难看','糟糕','失望','无聊'];
+    utils.positiveWords = ['good','great','love','excellent','amazing','favorite','喜欢','好看','精彩','推荐','不错','喜爱','超赞'];
+    utils.negativeWords = ['bad','terrible','boring','worst','disappoint','hate','难看','糟糕','失望','无聊','一般','欠缺'];
 
     utils.nounSuffixes = ['ment','ness','tion','sion','ity','er','or','ist','ism','age','ence','ship'];
     utils.adjSuffixes = ['able','ible','al','ful','ic','ive','less','ous','ish','y','ent','ant'];
@@ -45,7 +45,14 @@
         })).sort((a, b) => b.count - a.count);
     };
 
-    utils.average = arr => arr.length ? arr.reduce((sum, v) => sum + v, 0) / arr.length : 0;
+    // 修复：计算数值数组的平均值，忽略非数值，若无有效数值返回 NaN
+    utils.average = arr => {
+        if (!Array.isArray(arr)) return NaN;
+        const nums = arr.map(n => Number(n)).filter(Number.isFinite);
+        if (!nums.length) return NaN;
+        return nums.reduce((s, v) => s + v, 0) / nums.length;
+    };
+
     utils.frequencyMap = (items, extractor) => {
         const map = new Map();
         items.forEach(item => {
@@ -126,11 +133,11 @@
 
     utils.buildRatingHistogram = ratings => {
         const bins = [
-            { label: '🌟', min: 1, max: 1 },
-            { label: '🌟🌟', min: 2, max: 2 },
-            { label: '🌟🌟🌟', min: 3, max: 3 },
-            { label: '🌟🌟🌟🌟', min: 4, max: 4 },
-            { label: '🌟🌟🌟🌟🌟', min: 5, max: 5 }
+            { label: '1星', min: 1, max: 1 },
+            { label: '2星', min: 2, max: 2 },
+            { label: '3星', min: 3, max: 3 },
+            { label: '4星', min: 4, max: 4 },
+            { label: '5星', min: 5, max: 5 }
         ];
         return bins.map(bin => {
             const count = ratings.filter(r => r >= bin.min && r <= bin.max).length;
@@ -151,11 +158,8 @@
         const sorted = [...ratings].sort((a, b) => a - b);
         return {
             min: sorted[0],
-            q1: utils.getQuantileValue(sorted, 0.25),
             median: utils.getQuantileValue(sorted, 0.5),
-            q3: utils.getQuantileValue(sorted, 0.75),
             max: sorted[sorted.length - 1]
         };
     };
 })();
-

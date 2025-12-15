@@ -97,6 +97,11 @@
         });
     };
 
+    filters.getSelectedRange = () => ({
+        start: filterStart?.value ? new Date(filterStart.value) : null,
+        end: filterEnd?.value ? new Date(filterEnd.value) : null
+    });
+
     filters.populateYearOptions = items => {
         if (!filterYear) return;
         const years = new Set();
@@ -122,4 +127,3 @@
         if (shouldRefresh) refreshCallback();
     };
 })();
-
