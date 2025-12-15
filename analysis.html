@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>豆瓣电影数据分析</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="analysis">
+<a href="index.html" class="back">👈返回首页</a>
+<h1>豆瓣电影数据分析</h1>
+
+<!-- 新增：范围筛选区域 -->
+<div class="filter-row">
+    <label for="filter-start">更新时间 ≥</label>
+    <input id="filter-start" type="date" />
+    <label for="filter-end">更新时间 ≤</label>
+    <input id="filter-end" type="date" />
+</div>
+
+<div class="summary" id="summary-cards"></div>
+
+<section class="flex">
+    <div class="list">
+        <h3>热门类型 Top5</h3>
+        <ul id="genre-list"></ul>
+    </div>
+    <div class="list">
+        <h3>主要语言 Top5</h3>
+        <ul id="language-list"></ul>
+    </div>
+    <div class="list">
+        <h3>评分分布</h3>
+        <ul id="rating-list"></ul>
+    </div>
+    <div class="list">
+        <h3>演员排行榜</h3>
+        <ul id="actor-list"></ul>
+    </div>
+    <div class="list">
+        <h3>导演排行榜</h3>
+        <ul id="director-list"></ul>
+    </div>
+</section>
+
+<section>
+    <h2>年份与片长概览</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>年份</th>
+            <th>部数</th>
+            <th>平均片长(分钟)</th>
+        </tr>
+        </thead>
+        <tbody id="year-table"></tbody>
+    </table>
+</section>
+
+<script>
+    async function loadMovies() {
+        const res = await fetch('/data/movies.json', { cache: 'no-cache' });
+        if (!res.ok) throw new Error('无法加载 movies.json');
+        const data = await res.json();
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    function average(arr) {
+        return arr.length ? arr.reduce((sum, v) => sum + v, 0) / arr.length : 0;
+    }
+
+    function frequencyMap(items, extractor) {
+        const map = new Map();
+        items.forEach(item => {
+            const values = extractor(item);
+            values.filter(Boolean).forEach(val => {
+                map.set(val, (map.get(val) || 0) + 1);
+            });
+        });
+        return [...map.entries()].sort((a, b) => b[1] - a[1]);
+    }
+
+    const filterStart = document.getElementById('filter-start');
+    const filterEnd = document.getElementById('filter-end');
+    let allItems = [];
+
+    function normalizeField(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map(v => v.trim()).filter(Boolean);
+        return value.toString().split(/[，,、\/]+/).map(v => v.trim()).filter(Boolean);
+    }
+
+    function getFilteredItems() {
+        const start = filterStart.value ? new Date(filterStart.value) : null;
+        const end = filterEnd.value ? new Date(filterEnd.value) : null;
+        return allItems.filter(item => {
+            if (!item.updated_at) return true;
+            const date = new Date(item.updated_at);
+            if (Number.isNaN(date)) return true;
+            if (start && date < start) return false;
+            if (end && date > end) return false;
+            return true;
+        });
+    }
+
+    function renderTopList(targetId, list, emptyLabel = '暂无数据') {
+        const target = document.getElementById(targetId);
+        target.innerHTML = list.slice(0, 5).map(([label, count]) =>
+            `<li>${label}<span class="badge">${count}</span></li>`
+        ).join('') || `<li>${emptyLabel}</li>`;
+    }
+
+    function populateSummary(items) {
+            const ratings = items.map(x => Number(x.rating)).filter(Number.isFinite);
+            const years = items.map(x => Number(x.release_year)).filter(Number.isFinite);
+            const durations = items.map(x => Number(x.duration_minutes)).filter(Number.isFinite);
+            const totalMinutes = durations.reduce((sum, v) => sum + v, 0);
+            const totalCommentChars = items.reduce((sum, item) => {
+                const comments = Array.isArray(item.comments) ? item.comments : [];
+                return sum + comments.reduce((cSum, comment) => cSum + (comment ? comment.length : 0), 0);
+            }, 0);
+
+            const cards = [
+                { label: '影片总数', value: items.length },
+                { label: '平均评分', value: ratings.length ? average(ratings).toFixed(2) : '—' },
+                { label: '年份跨度', value: years.length ? `${Math.min(...years)} - ${Math.max(...years)}` : '—' },
+                { label: '平均片长', value: durations.length ? `${Math.round(average(durations))} 分钟` : '—' },
+                { label: '累计观看时长', value: durations.length ? `${(totalMinutes / 60).toFixed(1)} 小时` : '—' },
+                { label: '累计评论字数', value: totalCommentChars ? `${totalCommentChars.toLocaleString()} 字` : '—' },
+            ];
+
+            document.getElementById('summary-cards').innerHTML = cards.map(card => `
+            <div class="card">
+                <h2>${card.label}</h2>
+                <p>${card.value}</p>
+            </div>
+        `).join('');
+    }
+
+    function populateLists(items) {
+        const genres = frequencyMap(items, item => Array.isArray(item.genres) ? item.genres : (item.genres ? [item.genres] : []));
+        const languages = frequencyMap(items, item => Array.isArray(item.languages) ? item.languages : (item.languages ? [item.languages] : []));
+        const ratingsCount = frequencyMap(items, item => Number.isFinite(Number(item.rating)) ? [`${item.rating} 星`] : []);
+
+        renderTopList('genre-list', genres);
+        renderTopList('language-list', languages);
+        renderTopList('rating-list', ratingsCount);
+    }
+
+    function populateActorDirector(items) {
+        const actors = frequencyMap(items, item => normalizeField(item.actors));
+        const directors = frequencyMap(items, item => normalizeField(item.directors));
+        renderTopList('actor-list', actors);
+        renderTopList('director-list', directors);
+    }
+
+    function populateYearTable(items) {
+        const yearMap = new Map();
+        items.forEach(item => {
+            const year = Number(item.release_year);
+            const duration = Number(item.duration_minutes);
+            if (!Number.isFinite(year)) return;
+            if (!yearMap.has(year)) yearMap.set(year, []);
+            if (Number.isFinite(duration)) yearMap.get(year).push(duration);
+        });
+
+        const rows = [...yearMap.entries()].sort((a, b) => a[0] - b[0]).map(([year, durations]) => `
+        <tr>
+            <td>${year}</td>
+            <td>${durations.length}</td>
+            <td>${durations.length ? Math.round(average(durations)) : '—'}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="3">暂无年份数据</td></tr>';
+
+        document.getElementById('year-table').innerHTML = rows;
+    }
+
+    function refreshDashboard() {
+        const filtered = getFilteredItems();
+        populateSummary(filtered);
+        populateLists(filtered);
+        populateActorDirector(filtered);
+        populateYearTable(filtered);
+    }
+
+    filterStart.addEventListener('change', refreshDashboard);
+    filterEnd.addEventListener('change', refreshDashboard);
+
+    (async function init() {
+        try {
+            const items = await loadMovies();
+            allItems = items;
+            populateLists(items);
+            populateYearTable(items);
+            populateActorDirector(items);
+            populateSummary(items);
+            // 初始筛选后再渲染一次，确保默认状态一致
+            refreshDashboard();
+        } catch (err) {
+            document.body.innerHTML = `<p style="color:#dc2626;">加载失败：${err.message}</p>`;
+        }
+    })();
+</script>
+</body>
+</html>

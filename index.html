@@ -1,193 +1,115 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8" />
-    <title>豆瓣媒体同步（本地 JSON / 无官方 API）</title>
-    <style>
-        :root {
-            --bg: radial-gradient(180% 140% at 20% 20%, #f1f4ff 0%, #e8ecfb 45%, #dfe4f5 100%);
-            --panel: rgba(255,255,255,0.7);
-            --card: rgba(255,255,255,0.82);
-            --card-strong: rgba(245,245,255,0.9);
-            --text: #0f172a;
-            --muted: #5d6a86;
-            --accent: #6bd9a4;
-            --accent-2: #6a8dff;
-            --accent-3: #ff9f76;
-            --radius: 18px;
-            --shadow: 0 16px 38px rgba(0,0,0,0.15);
-            --blur: 12px;
-            --gap: 22px;
-        }
-        [data-theme="dark"] {
-            --bg: radial-gradient(180% 140% at 20% 20%, #1c2033 0%, #0f1324 45%, #090b14 100%);
-            --panel: rgba(22, 27, 46, 0.8);
-            --card: rgba(23, 28, 47, 0.9);
-            --card-strong: rgba(34, 42, 72, 0.95);
-            --text: #e9efff;
-            --muted: #8fa0c3;
-            --accent: #6de0ad;
-            --accent-2: #6a8dff;
-            --accent-3: #ff9f76;
-            --shadow: 0 20px 50px rgba(0,0,0,0.45);
-            --blur: 14px;
-        }
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; font-family: "SF Pro Display","Inter","PingFang SC","Microsoft YaHei",sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
-        .sidebar { width: 92px; padding: 22px 12px; display: flex; flex-direction: column; align-items: center; gap: 18px; background: var(--panel); border-right: 1px solid rgba(255,255,255,0.08); box-shadow: var(--shadow); backdrop-filter: blur(var(--blur)); }
-        .nav { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 12px; }
-        .nav button { width: 100%; aspect-ratio: 1/1; border: none; border-radius: 16px; background: var(--card); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: var(--shadow); backdrop-filter: blur(var(--blur)); transition: transform .1s ease, background .2s ease, box-shadow .2s ease; }
-        .nav button.active { background: linear-gradient(135deg,var(--accent-2),var(--accent)); color: #fff; transform: translateY(-1px); box-shadow: 0 12px 30px rgba(90,140,255,0.35); }
-        .spacer { flex: 1; }
-        .gear { width: 48px; height: 48px; border-radius: 16px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.1); background: var(--card-strong); color: var(--text); display: grid; place-items: center; cursor: pointer; }
-
-        .main { flex: 1; padding: 20px 30px 32px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(4px); }
-        header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
-        .search-box { position: relative; min-width: 540px; } /* 放大50% */
-        #search-input { width: 100%; border: none; outline: none; background: var(--card); color: var(--text); padding: 14px 56px 14px 18px; border-radius: 14px; box-shadow: var(--shadow); font-size: 14px; backdrop-filter: blur(var(--blur)); }
-        .search-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
-        .suggestions { position: absolute; top: 108%; left: 0; right: 0; background: var(--card-strong); border-radius: 14px; box-shadow: var(--shadow); max-height: 300px; overflow-y: auto; z-index: 10; display: none; backdrop-filter: blur(var(--blur)); }
-        .suggestion-item { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; }
-        .suggestion-item img { width: 40px; height: 54px; object-fit: cover; border-radius: 10px; background: rgba(0,0,0,0.06); }
-        .suggestion-item .title { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .suggestion-item:hover { background: rgba(90,140,255,0.12); }
-
-        .summary, .overview { display: none !important; }
-
-        .section-head { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
-        .pill { padding: 8px 12px; border-radius: 12px; background: var(--card); color: var(--muted); box-shadow: var(--shadow); backdrop-filter: blur(var(--blur)); }
-
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--gap); }
-        .card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); display: flex; gap: 14px; align-items: flex-start; position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.06); min-height: 170px; cursor: pointer; backdrop-filter: blur(var(--blur)); z-index: 1; }
-        .card::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 30% 20%, rgba(90,140,255,0.12), transparent 55%); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
-        .card:hover::after { opacity: 1; }
-        .card img { width: 92px; height: 128px; object-fit: cover; border-radius: 14px; flex-shrink: 0; background: rgba(255,255,255,0.18); border: 1px solid rgba(0,0,0,0.08); backdrop-filter: blur(var(--blur)); }
-        .title-txt { font-weight: 800; font-size: 15px; line-height: 1.45; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .meta, .desc, .tags, .comment-brief { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-        .desc { -webkit-line-clamp: 2; }
-        .tags { color: #b8894d; font-size: 12px; }
-        .time { color: #4ea785; font-size: 12px; margin-top: 4px; }
-        .comment-brief { color: #c37b44; }
-        .highlight { animation: flash 1.4s ease; box-shadow: 0 0 0 4px rgba(90,140,255,0.28), var(--shadow); border-color: rgba(90,140,255,0.35); }
-        @keyframes focusPulse {
-            0% { transform: scale(1); }
-            40% { transform: scale(1.5); }
-            100% { transform: scale(1); }
-        }
-        .focus-anim { animation: focusPulse 2s ease; position: relative; z-index: 40; }
-        @keyframes flash { 0% { transform: scale(1); } 50% { transform: scale(1.015); } 100% { transform: scale(1); } }
-
-        .pagination { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
-        .pagination button { border: none; border-radius: 12px; padding: 8px 12px; cursor: pointer; background: var(--card); box-shadow: var(--shadow); color: var(--text); backdrop-filter: blur(var(--blur)); }
-        .info-card { padding: 10px 14px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(0,0,0,0.08); color: var(--muted); }
-        .page-jump { display: inline-flex; align-items: center; gap: 6px; }
-        .page-input { width: 80px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: var(--card); color: var(--text); }
-
-        .modal-backdrop, .detail-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; z-index: 20; backdrop-filter: blur(6px); }
-        .detail-backdrop { z-index: 25; }
-        .modal, .detail-modal { background: var(--card-strong); color: var(--text); padding: 20px; border-radius: 18px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.08); backdrop-filter: blur(var(--blur)); }
-        .modal { width: 360px; max-height: 80vh; overflow: auto; }
-        .detail-modal { width: 540px; max-height: 80vh; overflow: auto; }
-        .modal h3 { margin: 0 0 14px; }
-        .modal-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .switch { position: relative; width: 46px; height: 26px; background: rgba(0,0,0,0.08); border-radius: 999px; cursor: pointer; }
-        .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s ease; }
-        .switch.on { background: linear-gradient(135deg, var(--accent-2), var(--accent)); }
-        .switch.on::after { transform: translateX(20px); }
-        .modal-actions { text-align: right; margin-top: 6px; }
-        .modal button { padding: 8px 14px; border-radius: 12px; border: none; background: var(--card); box-shadow: var(--shadow); cursor: pointer; }
-
-        .comment-item { margin-bottom: 8px; padding: 10px; border-radius: 12px; background: rgba(0,0,0,0.05); }
-        [data-theme="dark"] .comment-item { background: rgba(255,255,255,0.12); }
-
-        .detail-body { display: flex; gap: 14px; align-items: flex-start; }
-        .detail-cover { width: 120px; height: 168px; border-radius: 14px; object-fit: cover; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,0,0,0.08); }
-        .detail-section { margin-top: 12px; }
-        .detail-section b { display: block; margin-bottom: 4px; }
-
-        .dim-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.3);
-            pointer-events: none; opacity: 0; transition: opacity .2s ease;
-            z-index: 30;
-        }
-        .dim-overlay.show { opacity: 1; }
-    </style>
+    <title>豆瓣媒体同步</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body data-theme="light">
-<aside class="sidebar">
-    <div class="nav">
-        <button data-cat="movies" class="active" title="电影">🎬</button>
-        <button data-cat="books"  title="书籍">📚</button>
-        <button data-cat="games"  title="游戏">🎮</button>
-        <button data-cat="music"  title="音乐">🎵</button>
+<body data-theme="light" data-page="index">
+<div class="app">
+    <div class="panel top-panel">
+        <div class="top-bar">
+            <!-- 新增：搜索框（确保 id 与脚本一致） -->
+            <div class="search-box">
+                <input id="search-input" type="text" />
+                <span class="search-icon">🔍</span>
+                <div class="suggestions" id="suggestions" style="display:none;"></div>
+            </div>
+
+            <div class="controls">
+                <a href="/analysis.html" class="pill-link">数据分析 ↗</a>
+                <!-- 设置按钮移至右侧次级侧栏 -->
+            </div>
+        </div>
     </div>
-    <div class="spacer"></div>
-    <div class="gear" id="settings-btn">⚙️</div>
+
+    <div class="panel">
+        <div class="section-head">
+            <span>当前类别：<b id="current-cat">电影</b></span>
+        </div>
+        <div id="content"></div>
+        <div class="pagination">
+            <button id="prev-page">‹ 上一页</button>
+            <div class="info-card" id="page-info-bottom">第 1 / 1 页</div>
+            <div class="page-jump">
+                <label for="page-input">跳转</label>
+                <input id="page-input" class="page-input" type="number" min="1" step="1" />
+            </div>
+            <button id="next-page">下一页 ›</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新增：页面右侧固定侧栏（卡片罩住竖向图标按钮） -->
+<aside class="right-sidebar" aria-hidden="false">
+    <div class="sidebar-card">
+        <div class="nav-tabs" role="tablist" aria-orientation="vertical">
+            <button data-cat="movies" class="active" title="电影" aria-label="电影">
+                <span class="emoji" aria-hidden="true">🎬</span>
+            </button>
+            <button data-cat="books" title="书籍" aria-label="书籍">
+                <span class="emoji" aria-hidden="true">📚</span>
+            </button>
+            <button data-cat="games" title="游戏" aria-label="游戏">
+                <span class="emoji" aria-hidden="true">🎮</span>
+            </button>
+            <button data-cat="music" title="音乐" aria-label="音乐">
+                <span class="emoji" aria-hidden="true">🎵</span>
+            </button>
+        </div>
+    </div>
 </aside>
 
-<main class="main">
-    <header>
-        <div class="search-box">
-            <input id="search-input" type="text" placeholder="搜索..." aria-label="搜索" />
-            <span class="search-icon">🔍</span>
-            <div id="suggestions" class="suggestions"></div>
-        </div>
-    </header>
-
-    <div class="section-head">
-        <div class="pill">当前类别：<span id="current-cat">电影</span></div>
+<!-- 新增：设置独立侧栏，位于主侧栏下方约 130px -->
+<aside class="right-sidebar-secondary" aria-hidden="false">
+    <div class="sidebar-card-secondary">
+        <button class="settings-icon-btn" id="settings-btn" title="设置" aria-label="设置">⚙️</button>
     </div>
-
-    <div id="content" class="grid"></div>
-    <div class="pagination">
-        <button id="prev-page">‹ 上一页</button>
-        <div class="info-card" id="page-info-bottom">第 1 / 1 页</div>
-        <div class="page-jump">
-            <label for="page-input" style="color:var(--muted);font-size:13px;">跳转页</label>
-            <input id="page-input" class="page-input" type="number" min="1" step="1" />
-        </div>
-        <button id="next-page">下一页 ›</button>
-    </div>
-</main>
+</aside>
 
 <div class="modal-backdrop" id="modal-backdrop">
     <div class="modal">
-        <h3>设置</h3>
-        <div class="modal-row">
-            <span>浅色模式</span>
-            <div id="theme-switch" class="switch on"></div>
+        <div class="modal-head">
+            <div class="modal-icon">⚙️</div>
+            <div class="modal-title">
+                <h3>界面设置</h3>
+                <p>调整深浅配色与显示偏好</p>
+            </div>
+            <button id="close-modal" class="modal-close" aria-label="关闭设置">✕</button>
         </div>
-        <div class="modal-actions">
-            <button id="close-modal">关闭</button>
+        <div class="modal-body">
+            <div class="modal-row">
+                <div>
+                    <div class="row-title">浅色模式</div>
+                    <div class="row-sub">在浅色/深色之间快速切换</div>
+                </div>
+                <button id="theme-switch" class="switch on" role="switch" aria-checked="true" tabindex="0"></button>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="detail-backdrop" id="detail-backdrop">
     <div class="detail-modal">
-        <button id="detail-close" style="float:right;">✕</button>
+        <div class="detail-modal-head">
+            <div class="detail-title-wrap">
+                <h3 id="detail-title"></h3>
+                <div id="detail-meta" class="meta detail-meta"></div>
+            </div>
+            <button id="detail-close" class="detail-close" aria-label="关闭详情">✕</button>
+        </div>
         <div class="detail-body">
             <img id="detail-cover" class="detail-cover" alt="cover" src="" />
-            <div>
-                <h3 id="detail-title"></h3>
-                <div id="detail-meta" class="meta"></div>
+            <div class="detail-info">
+                <div class="detail-section glass-chip">
+                    <span class="section-label">时间</span>
+                    <div id="detail-time" class="time"></div>
+                </div>
+                <div class="detail-section glass-chip">
+                    <span class="section-label">评论</span>
+                    <div id="detail-comments" class="detail-comments"></div>
+                </div>
             </div>
-        </div>
-        <div class="detail-section">
-            <b>简介</b>
-            <div id="detail-desc" class="meta"></div>
-        </div>
-        <div class="detail-section">
-            <b>标签</b>
-            <div id="detail-tags" class="tags"></div>
-        </div>
-        <div class="detail-section">
-            <b>时间</b>
-            <div id="detail-time" class="time"></div>
-        </div>
-        <div class="detail-section">
-            <b>评论</b>
-            <div id="detail-comments" class="detail-comments"></div>
         </div>
     </div>
 </div>
@@ -195,9 +117,6 @@
 <div class="dim-overlay" id="dim-overlay"></div>
 
 <script>
-    document.body.dataset.theme = 'light';
-    document.getElementById('theme-switch').classList.add('on');
-
     const searchInput = document.getElementById('search-input');
     const suggestionsBox = document.getElementById('suggestions');
     const contentEl = document.getElementById('content');
@@ -210,8 +129,6 @@
     const detailClose = document.getElementById('detail-close');
     const detailTitle = document.getElementById('detail-title');
     const detailMeta = document.getElementById('detail-meta');
-    const detailDesc = document.getElementById('detail-desc');
-    const detailTags = document.getElementById('detail-tags');
     const detailTime = document.getElementById('detail-time');
     const detailComments = document.getElementById('detail-comments');
     const detailCover = document.getElementById('detail-cover');
@@ -220,6 +137,8 @@
     const pageInfoBottom = document.getElementById('page-info-bottom');
     const pageInput = document.getElementById('page-input');
     const dimOverlay = document.getElementById('dim-overlay');
+
+    initializeTheme();
 
     const PAGE_SIZE = 24;
     const BATCH_SIZE = 24;
@@ -240,9 +159,9 @@
         music:  '/data/music.json',
     };
 
-    document.querySelectorAll('.nav button').forEach(btn => {
+    document.querySelectorAll('.nav-tabs button').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeCat = btn.dataset.cat;
             state[activeCat].page = 1;
@@ -254,10 +173,15 @@
     settingsBtn.onclick = () => { modalBackdrop.style.display = 'flex'; };
     closeModalBtn.onclick = () => { modalBackdrop.style.display = 'none'; };
     themeSwitch.onclick = () => {
-        themeSwitch.classList.toggle('on');
-        const light = themeSwitch.classList.contains('on');
-        document.body.dataset.theme = light ? 'light' : 'dark';
+        const nextTheme = themeSwitch.classList.contains('on') ? 'dark' : 'light';
+        applyTheme(nextTheme);
     };
+    themeSwitch.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            themeSwitch.click();
+        }
+    });
 
     prevBtn.onclick = () => changePage(-1);
     nextBtn.onclick = () => changePage(1);
@@ -290,8 +214,6 @@
         const year = item.year || '';
         const stars = starify(item.rating);
         detailMeta.textContent = [year, stars].filter(Boolean).join(' · ');
-        detailDesc.textContent = item.desc || item.summary || '';
-        detailTags.textContent = item.tags && item.tags.length ? `#${item.tags.join(' #')}` : '';
         detailTime.textContent = item.updated_at || item.date || '';
         const comments = item.comments || [];
         detailComments.innerHTML = comments.length
@@ -401,29 +323,27 @@
 
         const info = document.createElement('div');
         info.innerHTML = `
-        <div class="title-txt">${title}</div>
-        <div class="meta">${[year, stars].filter(Boolean).join(' · ')}</div>
-        <div class="desc">${desc}</div>
-        <div class="tags">${tags}</div>
-        <div class="time">${time}</div>
-        <div class="comment-brief">${commentBrief ? `💬 ${commentBrief}` : ''}</div>
-      `;
+            <div class="title-txt">${title}</div>
+            <div class="meta">${[year, stars].filter(Boolean).join(' · ')}</div>
+            <div class="time">${time}</div>
+            <div class="comment-brief">${commentBrief ? `💬 ${commentBrief}` : ''}</div>
+        `;
 
         card.appendChild(img);
         card.appendChild(info);
         return card;
-        }
+    }
 
     function attachCardClicks() {
-      contentEl.querySelectorAll('.card').forEach(card => {
-        card.onclick = () => {
-          const cat = card.dataset.cat;
-          const idx = Number(card.dataset.idx);
-          const item = state[cat].items[idx];
-          if (!item) return;
-          openDetail(item);
-        };
-      });
+        contentEl.querySelectorAll('.card').forEach(card => {
+            card.onclick = () => {
+                const cat = card.dataset.cat;
+                const idx = Number(card.dataset.idx);
+                const item = state[cat].items[idx];
+                if (!item) return;
+                openDetail(item);
+            };
+        });
     }
 
     const PIC_ROOT = '/data/pic';
@@ -431,26 +351,26 @@
     let imgObserver = null;
 
     function setupLazyImages() {
-      if (imgObserver) imgObserver.disconnect();
-      imgObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            hydrateOneImage(entry.target);
-            imgObserver.unobserve(entry.target);
-          }
-        });
-      }, { rootMargin: '200px 0px', threshold: 0.1 });
+        if (imgObserver) imgObserver.disconnect();
+        imgObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    hydrateOneImage(entry.target);
+                    imgObserver.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '200px 0px', threshold: 0.1 });
 
-      contentEl.querySelectorAll('img[data-cover][data-slug]').forEach(img => {
-        imgObserver.observe(img);
-      });
+        contentEl.querySelectorAll('img[data-cover][data-slug]').forEach(img => {
+            imgObserver.observe(img);
+        });
     }
 
     async function hydrateOneImage(img) {
-      if (img.dataset.hydrated) return;
-      const cover = img.dataset.cover;
-      const slug = img.dataset.slug || 'pic';
-      const localPath = `${PIC_ROOT}/${slug}.jpg`;
+        if (img.dataset.hydrated) return;
+        const cover = img.dataset.cover;
+        const slug = img.dataset.slug || 'pic';
+        const localPath = `${PIC_ROOT}/${slug}.jpg`;
 
         if (slugHeadCache.has(localPath) || await headLocal(localPath)) {
             slugHeadCache.add(localPath);
@@ -481,9 +401,9 @@
     function placeholderSvg(text) {
         const safe = (text || '?').slice(0, 6);
         return `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='220'>
-        <rect width='100%' height='100%' fill='%23dfe4f5'/>
-        <text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle' fill='%235d6a86' font-size='18' font-family='Inter, sans-serif'>${safe}</text>
-      </svg>`;
+            <rect width='100%' height='100%' fill='%23dfe4f5'/>
+            <text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle' fill='%235d6a86' font-size='18' font-family='Inter, sans-serif'>${safe}</text>
+        </svg>`;
     }
 
     let searchDebounce = null;
@@ -496,11 +416,11 @@
     function showSuggestions(list) {
         if (!list.length) { suggestionsBox.style.display = 'none'; suggestionsBox.innerHTML = ''; return; }
         suggestionsBox.innerHTML = list.map(x => `
-        <div class="suggestion-item" data-idx="${x.idx}">
-          <img src="${x.cover || `data:image/svg+xml,${encodeURIComponent(placeholderSvg(x.title))}`}" alt="">
-          <div class="title">${x.title}</div>
-        </div>
-      `).join('');
+            <div class="suggestion-item" data-idx="${x.idx}">
+                <img src="${x.cover || `data:image/svg+xml,${encodeURIComponent(placeholderSvg(x.title))}`}" alt="">
+                <div class="title">${x.title}</div>
+            </div>
+        `).join('');
         suggestionsBox.style.display = 'block';
     }
     function hideSuggestions() { suggestionsBox.style.display = 'none'; suggestionsBox.innerHTML = ''; }
@@ -542,14 +462,29 @@
         const el = document.getElementById(id);
         if (!el) return;
         dimOverlay.classList.add('show');
-        el.classList.remove('focus-anim');
-        void el.offsetWidth;
-        el.classList.add('focus-anim');
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setTimeout(() => {
-            el.classList.remove('focus-anim');
             dimOverlay.classList.remove('show');
         }, 2000);
+    }
+
+    function initializeTheme() {
+        const stored = localStorage.getItem('theme');
+        if (stored === 'light' || stored === 'dark') {
+            applyTheme(stored);
+            return;
+        }
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(prefersDark ? 'dark' : 'light');
+    }
+
+    function applyTheme(theme) {
+        const isLight = theme !== 'dark';
+        document.body.dataset.theme = theme;
+        document.documentElement.dataset.theme = theme;
+        themeSwitch.classList.toggle('on', isLight);
+        themeSwitch.setAttribute('aria-checked', String(isLight));
+        localStorage.setItem('theme', theme);
     }
 
     loadAll();

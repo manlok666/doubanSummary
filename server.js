@@ -15,6 +15,11 @@ await fs.mkdir(PIC_DIR, { recursive: true });
 app.use('/data', express.static(path.join(__dirname, 'data')));
 app.use('/', express.static(__dirname));
 
+//指定analyze.html的路由
+app.get('/analysis', (req, res) => {
+    res.sendFile(path.join(__dirname, 'analysis.html'));
+});
+
 // 缓存图片接口
 app.post('/api/cache-image', async (req, res) => {
     const { slug, url } = req.body || {};
