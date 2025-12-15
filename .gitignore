@@ -8,6 +8,7 @@ tests/**/coverage/
 dist/*
 dist_prod/*
 !.gitkeep
+.env
 
 # Editor directories and files
 .idea
