@@ -1,16 +1,30 @@
-/* 全局 */
-:root {
-    font-family: "Inter","PingFang SC","Microsoft YaHei",sans-serif;
-    color: #0f172a;
-}
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
 
-/* ========== 毛玻璃（Frosted glass）全局变量与通用类 ========== */
+/* 全局 */
 :root {
     --glass-bg: rgb(255, 255, 255);
     --glass-bg-strong: rgba(255,255,255,0.72);
     --glass-border: rgba(255,255,255,0.35);
     --glass-shadow: 0 10px 30px rgba(15,23,42,0.08);
     --glass-blur: 10px;
+
+    font-family: "Space Grotesk","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    color: #0f172a;
+    --font-sans: "Space Grotesk","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-heading: "Space Grotesk","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semi-bold: 600;
+
+    --data-primary: #4338ca;
+    --data-secondary: #0ea5e9;
+    --data-accent: #14b8a6;
+    --data-muted: #475569;
+
+    --base-font-size: 15px;
+    --base-line-height: 1.58;
+    --heading-line-height: 1.18;
+    --heading-color: inherit;
 }
 
 /* 通用毛玻璃类（可复用） */
@@ -791,3 +805,282 @@ body[data-theme="dark"] .comment-item {
     outline: none;
     border-color: #6366f1;
 }
+[data-page="analysis"] .filter-row select {
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid #cbd5f5;
+    background: #fff;
+    font-size: 14px;
+    color: #0f172a;
+    box-shadow: inset 0 0 0 1px #e2e8f0;
+}
+[data-page="analysis"] .filter-row select:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+/* 稍微压缩控件宽度以提升信息密度 */
+[data-page="analysis"] .filter-row label { white-space: nowrap; }
+[data-page="analysis"] .filter-row select#filter-year { width: 100px; }
+[data-page="analysis"] .filter-row select#filter-month { width: 84px; }
+
+[data-page="analysis"] .summary .card h2 {
+    color: var(--data-muted);
+    font-size: 14px;
+    letter-spacing: 0.02em;
+}
+[data-page="analysis"] .summary .card .data-value {
+    margin: 8px 0 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--data-primary);
+    letter-spacing: -0.02em;
+}
+[data-page="analysis"] .summary .card:nth-child(2) .data-value { color: var(--data-secondary); }
+[data-page="analysis"] .summary .card:nth-child(3) .data-value { color: var(--data-accent); }
+[data-page="analysis"] .summary .card:nth-child(4) .data-value { color: #0f172a; }
+[data-page="analysis"] .summary .card:nth-child(5) .data-value { color: #9333ea; }
+
+[data-page="analysis"] table td:nth-child(2),
+[data-page="analysis"] table th:nth-child(2) { color: var(--data-primary); }
+[data-page="analysis"] table td:nth-child(3),
+[data-page="analysis"] table th:nth-child(3) { color: var(--data-accent); }
+[data-page="analysis"] table td:nth-child(4),
+[data-page="analysis"] table th:nth-child(4) { color: var(--data-secondary); }
+[data-page="analysis"] table th {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+[data-page="analysis"] table td {
+    font-weight: 500;
+}
+
+/* ========== 字体渲染与排版优化覆盖（提高可读性与一致性） ========== */
+
+/* 基础字体与渲染（覆盖/强化已有变量） */
+:root {
+    --base-font-size: 15px;
+    --base-line-height: 1.58;
+    --heading-line-height: 1.18;
+    --heading-color: inherit;
+}
+
+/* 全局文本优化 */
+body {
+    font-family: var(--font-sans);
+    font-size: var(--base-font-size);
+    line-height: var(--base-line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
+}
+
+/* 标题层级风格（轻量且易读） */
+h1, h2, h3, h4 {
+    color: var(--heading-color);
+    font-family: var(--font-heading);
+    margin: 0 0 12px 0;
+    line-height: var(--heading-line-height);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+h1 { font-size: 28px; }
+h2 { font-size: 18px; }
+h3 { font-size: 15px; }
+
+/* 卡片与索引标题微调 */
+[data-page="index"] .title-txt,
+[data-page="analysis"] .card .title-txt {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+
+/* 卡片次要文字（meta / tags / time / brief） */
+[data-page="index"] .meta,
+[data-page="index"] .tags,
+[data-page="index"] .time,
+[data-page="index"] .comment-brief,
+[data-page="analysis"] .card .meta,
+[data-page="analysis"] .card .desc {
+    font-size: 13px;
+    color: var(--data-muted);
+    line-height: 1.45;
+}
+
+/* 表格与列表的紧凑文本风格 */
+[data-page="analysis"] th,
+[data-page="analysis"] td,
+[data-page="analysis"] .list li {
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+/* 悬浮/聚焦可读性增强 */
+button, input, select, textarea {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+/* 小屏与超长文本处理 */
+@media (max-width: 980px) {
+    h1 { font-size: 22px; }
+    body { font-size: 14px; }
+    [data-page="index"] .title-txt { font-size: 14px; }
+}
+
+/* 细节：增强数字/数据的可读性 */
+.data-value, .badge {
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+}
+
+/* ====== 创作者页签（导演/编剧/演员）视觉更新，扁平化毛玻璃风格 ====== */
+.creator-panel { display: flex; flex-direction: column; }
+
+/* 页签容器 */
+.creator-tabs {
+    display: inline-flex;
+    gap: 10px;
+    background: transparent;
+    align-items: center;
+    padding: 4px;
+}
+
+/* 基础按钮样式：半透明毛玻璃、左侧图标槽、圆角 */
+.creator-tabs button {
+    position: relative;
+    padding: 8px 14px 8px 44px; /* 为左侧图标留空间 */
+    border-radius: 14px;
+    border: 1px solid rgba(15,23,42,0.06);
+    background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(255,255,255,0.64));
+    color: #0f172a;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease;
+    backdrop-filter: blur(6px) saturate(120%);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    box-shadow: 0 8px 20px rgba(15,23,42,0.04);
+    overflow: hidden;
+}
+
+/* 左侧图标槽（使用伪元素展示 emoji，不改动 HTML） */
+.creator-tabs button::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9));
+    box-shadow: 0 8px 18px rgba(15,23,42,0.06);
+}
+
+/* 根据 data-role 注入 emoji（保持可访问性 title/aria-label） */
+.creator-tabs button[data-role="directors"]::before { content: "🎬"; }
+.creator-tabs button[data-role="writers"]::before   { content: "✍️"; }
+.creator-tabs button[data-role="actors"]::before    { content: "🎭"; }
+
+/* hover 与焦点反馈（轻微提升与阴影） */
+.creator-tabs button:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(15,23,42,0.07); }
+.creator-tabs button:focus-visible {
+    outline: 3px solid rgba(99,102,241,0.18);
+    outline-offset: 4px;
+}
+
+/* active 状态：主色渐变 + 白色文字，图标槽也变色（但 emoji 本色会保留） */
+.creator-tabs button.active {
+    background: linear-gradient(135deg, var(--data-primary), var(--data-secondary));
+    color: #fff;
+    box-shadow: 0 18px 44px rgba(67,56,202,0.12);
+    transform: none;
+}
+.creator-tabs button.active::before {
+    background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+    color: #fff;
+}
+
+/* 移动端适配：允许换行并稍微压缩 */
+@media (max-width: 900px) {
+    .creator-tabs { flex-wrap: wrap; gap: 8px; }
+    .creator-tabs button { padding: 8px 12px 8px 38px; min-height: 40px; font-size: 13px; }
+    .creator-tabs button::before { left: 8px; width: 24px; height: 24px; font-size: 14px; border-radius: 6px; }
+}
+
+/* 微调 persona-cards 在视觉上的间距（复用 summary 的样式），确保头部卡片间距与 summary-card 保持一致 */
+[data-page="analysis"] .summary#persona-cards {
+    margin-top: 12px; /* 与 summary-cards 保持些许间隔 */
+}
+
+/* 保证 persona 卡片使用与 summary 卡片一致的视觉（若需要可以在此覆盖） */
+[data-page="analysis"] #persona-cards .card h2 {
+    font-size: 13px;
+    color: var(--data-muted);
+}
+[data-page="analysis"] #persona-cards .card .data-value {
+    font-size: 22px;
+    color: var(--data-primary);
+    font-weight: 700;
+}
+
+/* 评分柱状图样式（chart-histogram） */
+.chart-histogram { display: flex; flex-direction: column; gap: 10px; }
+.chart-histogram .hist-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.chart-histogram .hist-label {
+    width: 72px;
+    flex: 0 0 72px;
+    font-weight: 600;
+    color: var(--data-muted);
+    font-size: 13px;
+}
+.chart-histogram .hist-bar-wrap {
+    flex: 1 1 auto;
+    height: 12px;
+    background: rgba(15,23,42,0.06);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+.chart-histogram .hist-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--data-primary), var(--data-secondary));
+    border-radius: 8px 0 0 8px;
+    transition: width .36s ease;
+    box-shadow: 0 6px 18px rgba(67,56,202,0.08);
+}
+.chart-histogram .hist-count {
+    width: 48px;
+    flex: 0 0 48px;
+    text-align: right;
+    font-weight: 700;
+    color: var(--data-primary);
+    font-size: 13px;
+}
+.chart-histogram .hist-empty { color: #94a3b8; font-size: 14px; padding: 12px 0; }
+
+/* 移动端调整：标签缩小，计数位置靠右不换行 */
+@media (max-width: 720px) {
+    .chart-histogram .hist-label { width: 56px; font-size: 12px; }
+    .chart-histogram .hist-count { width: 36px; font-size: 12px; }
+}
+
