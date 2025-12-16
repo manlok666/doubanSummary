@@ -19,10 +19,19 @@
                 <span class="search-icon">🔍</span>
                 <div class="suggestions" id="suggestions" style="display:none;"></div>
             </div>
-
+            <a href="/analysis.html" class="pill-link">数据分析 👉</a>
             <div class="controls">
-                <a href="/analysis.html" class="pill-link">数据分析 ↗</a>
-                <!-- 设置按钮移至右侧次级侧栏 -->
+                <div class="filters">
+                    <div class="filter-group">
+                        <div class="filter-label">观影年份</div>
+                        <div class="chip-list" id="filter-watch-years"></div>
+                    </div>
+                    <!-- 上映年份筛选已移除 -->
+                    <div class="filter-group">
+                        <div class="filter-label">评分</div>
+                        <div class="chip-list" id="filter-ratings"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -100,6 +109,8 @@
                 <h3 id="detail-title"></h3>
                 <div id="detail-meta" class="meta detail-meta"></div>
             </div>
+            <!-- 新增：在豆瓣跳转按钮 -->
+            <button id="detail-open-link" class="detail-open-link" aria-label="在豆瓣打开">豆瓣🔗</button>
             <button id="detail-close" class="detail-close" aria-label="关闭详情">✕</button>
         </div>
         <div class="detail-body">
@@ -141,6 +152,10 @@
     const pageInfoBottom = document.getElementById('page-info-bottom');
     const pageInput = document.getElementById('page-input');
     const dimOverlay = document.getElementById('dim-overlay');
+    const watchYearWrap = document.getElementById('filter-watch-years');
+    // releaseYearWrap 已删除
+    const ratingWrap = document.getElementById('filter-ratings');
+    const filtersPanel = document.getElementById('filters-panel');
 
     initializeTheme();
 
@@ -170,6 +185,7 @@
             activeCat = btn.dataset.cat;
             state[activeCat].page = 1;
             currentCatLabel.textContent = {movies:'电影',books:'书籍',games:'游戏',music:'音乐'}[activeCat];
+            populateFilterOptions();
             render();
         });
     });
@@ -193,7 +209,9 @@
     pageInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
             const target = Number(pageInput.value);
-            const totalPages = Math.max(1, Math.ceil(state[activeCat].items.length / PAGE_SIZE));
+            // 使用过滤后的条目数计算总页数
+            const filteredCount = applyIndexFilters(state[activeCat].items).length;
+            const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
             const page = Math.min(totalPages, Math.max(1, isFinite(target) ? target : 1));
             state[activeCat].page = page;
             render();
@@ -201,8 +219,10 @@
     });
 
     function changePage(delta) {
+        // 使用过滤后的条目数计算总页数
         const catState = state[activeCat];
-        const total = Math.max(1, Math.ceil(catState.items.length / PAGE_SIZE));
+        const filteredCount = applyIndexFilters(catState.items).length;
+        const total = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
         catState.page = Math.min(total, Math.max(1, catState.page + delta));
         render();
     }
@@ -231,6 +251,18 @@
         } else {
             detailCover.src = `data:image/svg+xml,${encodeURIComponent(placeholderSvg(item.title))}`;
         }
+        // 绑定详情弹窗的豆瓣跳转按钮
+        const detailOpenBtn = document.getElementById('detail-open-link');
+        if (detailOpenBtn) {
+            detailOpenBtn.dataset.link = item.link || '';
+            detailOpenBtn.onclick = (e) => {
+                e.stopPropagation();
+                const l = detailOpenBtn.dataset.link;
+                if (l) window.open(l, '_blank', 'noopener');
+            };
+            // 隐藏/显示按钮根据 link 是否存在
+            detailOpenBtn.style.display = item.link ? 'inline-flex' : 'none';
+        }
         detailBackdrop.style.display = 'flex';
     }
     detailBackdrop.addEventListener('click', e => { if (e.target === detailBackdrop) detailBackdrop.style.display = 'none'; });
@@ -249,6 +281,7 @@
             state[cat].items = data.items || [];
             state[cat].page = 1;
             buildGlobalIndex(cat);
+            if (cat === activeCat) populateFilterOptions();
         } catch (e) {
             console.error(`${cat} 加载失败：${e.message}`);
         }
@@ -264,28 +297,35 @@
     }
 
     function render() {
-        const { items, page } = state[activeCat];
-        const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+        const { items } = state[activeCat];
+        // applyIndexFilters 现在返回 entries: [{item, idx}, ...]
+        const filteredEntries = applyIndexFilters(items);
+        const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+        const page = Math.min(totalPages, Math.max(1, state[activeCat].page));
+        state[activeCat].page = page;
         const start = (page - 1) * PAGE_SIZE;
-        const pageItems = items.slice(start, start + PAGE_SIZE);
+        const pageEntries = filteredEntries.slice(start, start + PAGE_SIZE);
 
         contentEl.innerHTML = '';
-        renderPageBatched(pageItems, start);
+        // 传入 entries 列表（每项为 {item, idx}）
+        renderPageBatched(pageEntries);
 
         pageInfoBottom.textContent = `第 ${page} / ${totalPages} 页`;
         prevBtn.disabled = page <= 1;
         nextBtn.disabled = page >= totalPages;
     }
 
-    function renderPageBatched(list, offset) {
+    function renderPageBatched(entries) {
         let i = 0;
         function step() {
             const batchFrag = document.createDocumentFragment();
-            for (let c = 0; c < BATCH_SIZE && i < list.length; c++, i++) {
-                batchFrag.appendChild(makeCard(list[i], offset + i));
+            for (let c = 0; c < BATCH_SIZE && i < entries.length; c++, i++) {
+                // entries[i] 是 { item, idx }
+                const entry = entries[i];
+                batchFrag.appendChild(makeCard(entry.item, entry.idx));
             }
             contentEl.appendChild(batchFrag);
-            if (i < list.length) {
+            if (i < entries.length) {
                 requestAnimationFrame(step);
             } else {
                 attachCardClicks();
@@ -318,6 +358,7 @@
         card.className = 'card';
         card.id = id;
         card.dataset.cat = cat;
+        // dataset.idx 保存原始数组索引，供点击读取真实对象
         card.dataset.idx = idx;
 
         const img = document.createElement('img');
@@ -499,6 +540,89 @@
         themeSwitch.setAttribute('aria-checked', String(isLight));
         localStorage.setItem('theme', theme);
     }
+
+    const filterState = {
+        watchYears: new Set(),
+        // releaseYears: new Set(),  已移除
+        ratings: new Set()
+    };
+
+    function getYearFromDate(val) {
+        if (!val) return null;
+        const d = new Date(val);
+        return Number.isFinite(d.getTime()) ? d.getFullYear() : null;
+    }
+
+    function populateFilterOptions() {
+        const items = state[activeCat].items || [];
+        const watchYears = new Set();
+        // const releaseYears = new Set(); 已移除
+        items.forEach(item => {
+            const watch = getYearFromDate(item.updated_at || item.date);
+            if (watch) watchYears.add(watch);
+            // 上映年份收集已移除
+        });
+        renderChipList(watchYearWrap, [...watchYears].sort((a,b)=>b-a), filterState.watchYears);
+        // 不再渲染 release 年份
+        if (!ratingWrap.dataset.ready) {
+            const stars = [5,4,3,2,1];
+            ratingWrap.innerHTML = stars.map(r => `
+                <button type="button" class="chip" data-value="${r}">
+                    ${'⭐'.repeat(r)}
+                </button>`).join('');
+            ratingWrap.dataset.ready = '1';
+            bindChipContainer(ratingWrap, filterState.ratings);
+        } else {
+            syncChipState(ratingWrap, filterState.ratings);
+        }
+    }
+
+    function renderChipList(container, values, stateSet) {
+        container.innerHTML = values.map(val => `
+            <button type="button" class="chip ${stateSet.has(String(val))?'active':''}" data-value="${val}">
+                ${val}
+            </button>`).join('');
+        bindChipContainer(container, stateSet);
+    }
+
+    function bindChipContainer(container, stateSet) {
+        container.querySelectorAll('.chip').forEach(btn => {
+            btn.onclick = () => {
+                const value = btn.dataset.value;
+                if (stateSet.has(value)) stateSet.delete(value);
+                else stateSet.add(value);
+                btn.classList.toggle('active');
+                state[activeCat].page = 1;
+                render();
+            };
+        });
+    }
+
+    function syncChipState(container, stateSet) {
+        container.querySelectorAll('.chip').forEach(btn => {
+            btn.classList.toggle('active', stateSet.has(btn.dataset.value));
+        });
+    }
+
+    function applyIndexFilters(items) {
+        // 返回 entries（包含原始 idx），便于渲染后点击还原到原数组索引
+        const entries = (items || []).map((item, idx) => ({ item, idx }));
+        const watchYears = filterState.watchYears;
+        const ratings = filterState.ratings;
+        if (!watchYears.size && !ratings.size) return entries;
+
+        return entries.filter(({ item }) => {
+            const watch = getYearFromDate(item.updated_at || item.date);
+            if (watchYears.size && (!watch || !watchYears.has(String(watch)))) return false;
+            const rating = Number(item.rating);
+            if (ratings.size) {
+                const rounded = Math.max(1, Math.min(5, Math.round(rating)));
+                if (!ratings.has(String(rounded))) return false;
+            }
+            return true;
+        });
+    }
+
 
     loadAll();
 </script>
