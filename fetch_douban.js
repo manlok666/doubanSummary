@@ -220,7 +220,6 @@ async function fetchMovieDetail(link) {
 async function fetchWithPagination(name) {
     const base = URLS[name];
     let history = await loadHistory(name);
-    const seenDates = new Set(history.map(i => i.updated_at).filter(Boolean));
     const existingLinks = new Set(history.map(i => i.link).filter(Boolean));
 
     let start = 0;
@@ -241,10 +240,9 @@ async function fetchWithPagination(name) {
         }
 
         // 本页中新出现（按日期判重）的条目
-        const newOnes = items.filter(it => it.updated_at && !seenDates.has(it.updated_at));
+        const newOnes = items.filter(it => it.link && !existingLinks.has(it.link));
         newOnes.forEach(it => {
-            if (it.updated_at) seenDates.add(it.updated_at);
-            if (it.link) existingLinks.add(it.link); // 防止后续页重复抓取详情
+            existingLinks.add(it.link); // 防止后续页重复抓取详情
         });
 
         // 将本页新增合并到 history，并立刻保存（每页保存一次）

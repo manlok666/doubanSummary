@@ -442,7 +442,7 @@
         }, null);
 
         const cards = [
-            { label: '月均观影', value: pace !== '—' ? `${pace} 部/月` : '—' },
+            { label: '月均观影', value: pace !== '—' ? `${pace} 部` : '—' },
             { label: '常看类型', value: genreStats.length ? `${genreStats[0].label}（${genreStats[0].count} 部）` : '—' },
             { label: '偏好地区', value: regionStats.length ? `${regionStats[0].label}` : '—' },
             { label: '偏好语言', value: languageStats.length ? `${languageStats[0].label}` : '—' },

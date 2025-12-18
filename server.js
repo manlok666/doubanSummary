@@ -38,5 +38,29 @@ app.post('/api/cache-image', async (req, res) => {
     }
 });
 
+// 防止并发执行的锁
+let isFetching = false;
+
+//执行fetch_douban.js的main函数
+app.get('/api/fresh', async (req, res) => {
+    if (isFetching) {
+        console.warn('Fetch already in progress, rejecting new request.');
+        return res.status(409).send('fetch already in progress');
+    }
+
+    isFetching = true;
+    try {
+        const { main } = await import('./fetch_douban.js');
+        await main();
+        res.status(200).send('fetch completed');
+    } catch (e) {
+        console.error(e);
+        res.status(500).send('fetch failed');
+    } finally {
+        isFetching = false;
+        console.info('Fetch lock released');
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

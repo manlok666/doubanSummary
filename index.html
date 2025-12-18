@@ -19,7 +19,8 @@
                 <span class="search-icon">🔍</span>
                 <div class="suggestions" id="suggestions" style="display:none;"></div>
             </div>
-            <a href="/analysis.html" class="pill-link">数据分析 👉</a>
+            <a href="/analysis.html" class="pill-link">📊 数据分析</a>
+            <a id="refresh-data-btn" class="pill-link" title="刷新数据">🔄 刷新</a>
             <div class="controls">
                 <div class="filters">
                     <div class="filter-group">
@@ -74,11 +75,7 @@
 </aside>
 
 <!-- 新增：设置独立侧栏，位于主侧栏下方约 130px -->
-<aside class="right-sidebar-secondary" aria-hidden="false">
-    <div class="sidebar-card-secondary">
-        <button class="settings-icon-btn" id="settings-btn" title="设置" aria-label="设置">⚙️</button>
-    </div>
-</aside>
+
 
 <div class="modal-backdrop" id="modal-backdrop">
     <div class="modal">
@@ -136,7 +133,6 @@
     const suggestionsBox = document.getElementById('suggestions');
     const contentEl = document.getElementById('content');
     const currentCatLabel = document.getElementById('current-cat');
-    const settingsBtn = document.getElementById('settings-btn');
     const modalBackdrop = document.getElementById('modal-backdrop');
     const closeModalBtn = document.getElementById('close-modal');
     const themeSwitch = document.getElementById('theme-switch');
@@ -189,8 +185,7 @@
             render();
         });
     });
-
-    settingsBtn.onclick = () => { modalBackdrop.style.display = 'flex'; };
+    
     closeModalBtn.onclick = () => { modalBackdrop.style.display = 'none'; };
     themeSwitch.onclick = () => {
         const nextTheme = themeSwitch.classList.contains('on') ? 'dark' : 'light';
@@ -279,6 +274,12 @@
             if (!res.ok) throw new Error('获取失败');
             const data = await res.json();
             state[cat].items = data.items || [];
+            // 按 updated_at（回退到 date）做倒序排序，确保最新观影时间在前
+            state[cat].items.sort((a, b) => {
+                const ta = Date.parse(a.updated_at || a.date || '') || 0;
+                const tb = Date.parse(b.updated_at || b.date || '') || 0;
+                return tb - ta; // 倒序
+            });
             state[cat].page = 1;
             buildGlobalIndex(cat);
             if (cat === activeCat) populateFilterOptions();
@@ -625,6 +626,37 @@
 
 
     loadAll();
+
+    // 新增：刷新按钮绑定（尝试在浏览器端直接调用 fetch_douban.js.main，失败时回退到 /api/fetch-data）
+    (function(){
+        const refreshBtn = document.getElementById('refresh-data-btn');
+        if (!refreshBtn) return;
+        refreshBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            refreshBtn.disabled = true;
+            const originalText = refreshBtn.textContent;
+            refreshBtn.textContent = '刷新中...';
+            try {
+                // 尝试动态 import（可能在浏览器端因 Node API 而失败）
+                try {
+                    const res = await fetch('/api/fresh', { method: 'GET' });
+                    if (!res.ok) throw new Error('后端接口返回错误');
+                    console.info('后端 /api/fetch-data 刷新完成。');
+                } catch (err) {
+                    console.warn('无法在浏览器直接执行 fetch_douban.js.', err);
+                    throw new Error('刷新失败或已有刷新脚本在执行中，请稍后重试。若持续失败请检查ip地址是否可访问豆瓣网。');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('' + (e && e.message ? e.message : '未知错误'));
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = originalText;
+                // 重新加载数据
+                await loadAll();
+            }
+        });
+    })();
 </script>
 </body>
 </html>
